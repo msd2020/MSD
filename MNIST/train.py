@@ -101,8 +101,12 @@ def trainer(params, device_id, batch_size, choice, alpha_l_1, alpha_l_2, alpha_l
         if choice == 6:
             train_loss, train_acc = epoch(train_loader, lr_schedule, model, epoch_i = t, opt = opt, device = device)
         elif choice == 4:
-            train_loss, train_acc = triple_adv(train_loader, lr_schedule, model, epoch_i = t, attack = attack, opt = opt, device = device, k_map = k_map, epsilon_l_1 = epsilon_l_1, epsilon_l_2 = epsilon_l_2, epsilon_l_inf = epsilon_l_inf)
-        elif choice in [3,9]:
+            train_loss, train_acc = triple_adv(train_loader, lr_schedule, model, epoch_i = t, attack = attack, 
+            												opt = opt, device = device, k_map = k_map, 
+            												alpha_l_inf = alpha_l_inf, alpha_l_2 = alpha_l_2, alpha_l_1 = alpha_l_1, 
+            												num_iter = num_iter, epsilon_l_1 = epsilon_l_1, epsilon_l_2 = epsilon_l_2, 
+            												epsilon_l_inf = epsilon_l_inf)
+        elif choice in [3]:
             train_loss, train_acc = epoch_adversarial(train_loader, lr_schedule, model, epoch_i = t, attack = attack, 
                                                             opt = opt, device = device, k_map = k_map, 
                                                             alpha_l_inf = alpha_l_inf, alpha_l_2 = alpha_l_2, alpha_l_1 = alpha_l_1, 
@@ -136,7 +140,7 @@ if __name__ == "__main__":
     parser.add_argument("-gpu_id", help="Id of GPU to be used", type=int, default = 0)
     parser.add_argument("-model", help="Type of Adversarial Training: \n\t 0: l_inf \n\t 1: l_1 \n\t 2: l_2 \n\t 3: msd \n\t 4: avg \n\t 5: max \n\t 6: vanilla", type=int, default = 3)
     parser.add_argument("-batch_size", help = "Batch Size for Train Set (Default = 100)", type = int, default = 100)
-    parser.add_argument("-alpha_l_1", help = "Step Size for L1 attacks", type = float, default = 0.8)
+    parser.add_argument("-alpha_l_1", help = "Step Size for L1 attacks", type = float, default = 1.0)
     parser.add_argument("-alpha_l_2", help = "Step Size for L2 attacks", type = float, default = 0.1)
     parser.add_argument("-alpha_l_inf", help = "Step Size for Linf attacks", type = float, default = 0.01)
     parser.add_argument("-num_iter", help = "PGD iterations", type = int, default = 100)

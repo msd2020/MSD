@@ -30,6 +30,7 @@ def norms_linf(Z):
 pgd_linf: epsilon=0.03, alpha=0.003, num_iter = 40
 pgd_l0  : epsilon = 12, alpha = 1
 pgd_l1_topk  : epsilon = 12, alpha = 0.05, num_iter = 40, k = rand(5,20) --> (alpha = alpha/k *20)
+~~~~0.05 =1 as multiplied by 20 in the code
 pgd_l2  : epsilon =0.5, alpha=0.05, num_iter = 50
 
 '''
@@ -80,6 +81,7 @@ def pgd_l2(model, X, y, epsilon=0.5, alpha=0.05, num_iter = 50, device = "cuda:0
 def pgd_l1_topk(model, X,y, epsilon = 12, alpha = 0.05, num_iter = 50, k = 20, device = "cuda:1", restarts = 1, version = 0):
     #Gap : Dont attack pixels closer than the gap value to 0 or 1
     gap = alpha
+    alpha_global = alpha
     max_delta = torch.zeros_like(X)
     delta = torch.zeros_like(X, requires_grad = True)
 
@@ -92,7 +94,7 @@ def pgd_l1_topk(model, X,y, epsilon = 12, alpha = 0.05, num_iter = 50, k = 20, d
         loss = nn.CrossEntropyLoss()(model(X+delta), y)
         loss.backward()
         k = random.randint(5,20)
-        alpha = 0.05/k*20
+        alpha = 20*alpha_global/k
         delta.data += alpha*correct*l1_dir_topk(delta.grad.detach(), delta.data, X, gap,k)
         if (norms_l1(delta) > epsilon).any():
             delta.data = proj_l1ball(delta.data, epsilon, device)
@@ -115,7 +117,7 @@ def pgd_l1_topk(model, X,y, epsilon = 12, alpha = 0.05, num_iter = 50, k = 20, d
             loss = nn.CrossEntropyLoss()(model(X+delta), y)
             loss.backward()
             k = random.randint(5,20)
-            alpha = 0.05/k*20
+            alpha = 20*alpha_global/k
             delta.data += alpha*correct*l1_dir_topk(delta.grad.detach(), delta.data, X, gap,k)
             if (norms_l1(delta) > epsilon).any():
                 delta.data = proj_l1ball(delta.data, epsilon, device)
@@ -442,7 +444,8 @@ def epoch_adversarial(loader, lr_schedule, model, epoch_i, attack, criterion = n
 
 
 def triple_adv(loader, lr_schedule, model, epoch_i, attack,  criterion = nn.CrossEntropyLoss(),
-                     opt=None, device= "cuda:0", epsilon_l_1 = 12, epsilon_l_2 = 0.5, epsilon_l_inf = 0.03, num_iter = 50):
+                     opt=None, device= "cuda:0", epsilon_l_1 = 12, epsilon_l_2 = 0.5, epsilon_l_inf = 0.03, 
+                     alpha_l_inf = 0.003, alpha_l_2 = 0.05, alpha_l_1 = 0.05, num_iter = 100, num_iter = 50):
     #AVG MODE
     train_loss = 0
     train_acc = 0
@@ -455,7 +458,7 @@ def triple_adv(loader, lr_schedule, model, epoch_i, attack,  criterion = nn.Cros
         ##Always calls the default version 0 for the individual attacks
 
         #L1
-        delta = pgd_l1_topk(model, X, y, device = device, epsilon = epsilon_l_1)
+        delta = pgd_l1_topk(model, X, y, device = device, epsilon = epsilon_l_1, alpha = alpha_l_1)
         output = model(X+delta)
         loss = criterion(output,y)
         train_loss += loss.item()*y.size(0)
@@ -468,7 +471,7 @@ def triple_adv(loader, lr_schedule, model, epoch_i, attack,  criterion = nn.Cros
             opt.step()
         
         #L2
-        delta = pgd_l2(model, X, y, device = device, epsilon = epsilon_l_2)
+        delta = pgd_l2(model, X, y, device = device, epsilon = epsilon_l_2, alpha = alpha_l_2)
         output = model(X+delta)
         loss = nn.CrossEntropyLoss()(output,y)
         train_loss += loss.item()*y.size(0)
@@ -482,7 +485,7 @@ def triple_adv(loader, lr_schedule, model, epoch_i, attack,  criterion = nn.Cros
         
 
         #Linf
-        delta = pgd_linf(model, X, y, device = device, epsilon = epsilon_l_inf)
+        delta = pgd_linf(model, X, y, device = device, epsilon = epsilon_l_inf, alpha = alpha_l_inf)
         output = model(X+delta)
         loss = nn.CrossEntropyLoss()(output,y)
         train_loss += loss.item()*y.size(0)

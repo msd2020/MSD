@@ -1,7 +1,7 @@
 ## Pretrained Models  
 Pretrained models for each of the training methods discussed in the paper are available at the link:
 `https://drive.google.com/open?id=1EPMYz5VqjhhJaxcpUgAiZvqS3bYbnjHM`
-Please download these model in a folder named `Selected`  to test the models.
+Please download these models in the folder named `Selected` in order to test the models.
 The testing code is automatically designed to pick the models from that folder. 
 
 ## Testing Code

@@ -11,7 +11,7 @@ import argparse
 from mnist_funcs import *
 
 
-def trainer(params, device_id, batch_size, choice, alpha_l_1, alpha_l_2, alpha_l_inf, num_iter, epochs, epsilon_l_1, epsilon_l_2, epsilon_l_inf, lr_mode, msd_initialization, smallest_adv, n, opt_type, lr_max, resume, resume_iter,seed):
+def trainer(params, device_id, batch_size, choice, alpha_l_1, alpha_l_2, alpha_l_inf, num_iter, epochs, epsilon_l_1, epsilon_l_2, epsilon_l_inf, lr_mode, msd_initialization, smallest_adv, n, opt_type, lr_max, resume, resume_iter,seed, randomize, k_map):
 
     mnist_train = datasets.MNIST("../../data", train=True, download=True, transform=transforms.ToTensor())
     mnist_test = datasets.MNIST("../../data", train=False, download=True, transform=transforms.ToTensor())
@@ -69,14 +69,14 @@ def trainer(params, device_id, batch_size, choice, alpha_l_1, alpha_l_2, alpha_l
         json.dump(params.__dict__, f, indent=2)
 
     lr_schedule = lambda t: np.interp([t], [0, epochs*2//5, epochs], [0, lr_max, 0])[0]
-    k_map = 0
+    # k_map = 0
     
     if lr_mode != None:
     	if lr_mode == 1:
     		lr_schedule = lambda t: np.interp([t], [0, 3, 10, epochs], [0, 0.05, 0.001, 0.0001])[0]
-    		k_map = 0
+    		# k_map = 0
     	elif lr_mode == 2:
-    		k_map = 0
+    		# k_map = 0
     		lr_schedule = lambda t: np.interp([t], [0, epochs*2//5, epochs*4//5, epochs], [0, lr_max, lr_max/10, 0])[0]
 
     if activation == "tanh":
@@ -105,23 +105,23 @@ def trainer(params, device_id, batch_size, choice, alpha_l_1, alpha_l_2, alpha_l
             												opt = opt, device = device, k_map = k_map, 
             												alpha_l_inf = alpha_l_inf, alpha_l_2 = alpha_l_2, alpha_l_1 = alpha_l_1, 
             												num_iter = num_iter, epsilon_l_1 = epsilon_l_1, epsilon_l_2 = epsilon_l_2, 
-            												epsilon_l_inf = epsilon_l_inf)
+            												epsilon_l_inf = epsilon_l_inf, randomize = randomize)
         elif choice in [3]:
             train_loss, train_acc = epoch_adversarial(train_loader, lr_schedule, model, epoch_i = t, attack = attack, 
                                                             opt = opt, device = device, k_map = k_map, 
                                                             alpha_l_inf = alpha_l_inf, alpha_l_2 = alpha_l_2, alpha_l_1 = alpha_l_1, 
                                                             num_iter = num_iter, epsilon_l_1 = epsilon_l_1, epsilon_l_2 = epsilon_l_2, 
-                                                            epsilon_l_inf = epsilon_l_inf, msd_init = msd_initialization)
+                                                            epsilon_l_inf = epsilon_l_inf, msd_init = msd_initialization, randomize = randomize)
         elif choice in [5]:
             train_loss, train_acc = epoch_adversarial(train_loader, lr_schedule, model, epoch_i = t, attack = attack, 
                                                             opt = opt, device = device, k_map = k_map, 
                                                             alpha_l_inf = alpha_l_inf, alpha_l_2 = alpha_l_2, alpha_l_1 = alpha_l_1, 
-                                                            num_iter = num_iter, epsilon_l_1 = epsilon_l_1, epsilon_l_2 = epsilon_l_2, epsilon_l_inf = epsilon_l_inf)
+                                                            num_iter = num_iter, epsilon_l_1 = epsilon_l_1, epsilon_l_2 = epsilon_l_2, epsilon_l_inf = epsilon_l_inf, randomize = randomize)
         
         elif choice == 1:
-            train_loss, train_acc = epoch_adversarial(train_loader, lr_schedule, model, epoch_i = t, attack = attack, opt = opt, device = device, k_map = k_map)
+            train_loss, train_acc = epoch_adversarial(train_loader, lr_schedule, model, epoch_i = t, attack = attack, opt = opt, device = device, k_map = k_map, randomize = randomize)
         else:
-            train_loss, train_acc = epoch_adversarial(train_loader, lr_schedule, model, epoch_i = t, attack = attack, opt = opt, device = device)
+            train_loss, train_acc = epoch_adversarial(train_loader, lr_schedule, model, epoch_i = t, attack = attack, opt = opt, device = device, randomize = randomize)
 
         test_loss, test_acc = epoch(test_loader, lr_schedule,  model, epoch_i = t,  device = device, stop = True)
         linf_loss, linf_acc = epoch_adversarial(test_loader, lr_schedule,  model, epoch_i = t, attack = pgd_linf, device = device, stop = True, epsilon = epsilon_l_inf)
@@ -158,6 +158,8 @@ if __name__ == "__main__":
     parser.add_argument("-resume", help = "For Saving", type = int, default = 0)
     parser.add_argument("-resume_iter", help = "For Saving", type = int, default = -1)
     parser.add_argument("-seed", help = "Seed", type = int, default = 0)
+    parser.add_argument("-randomize", help = "Seed", type = int, default = 0)
+    parser.add_argument("-k_map", help = "K for L1 attack", type = int, default = 0)
     params = parser.parse_args()
     device_id = params.gpu_id
     batch_size = params.batch_size
@@ -180,4 +182,6 @@ if __name__ == "__main__":
     resume_iter = params.resume_iter
     activation = params.activation
     seed = params.seed
-    trainer(params, device_id, batch_size, choice, alpha_l_1, alpha_l_2, alpha_l_inf, num_iter, epochs, epsilon_l_1, epsilon_l_2, epsilon_l_inf, lr_mode, msd_initialization, smallest_adv, n, opt_type, lr_max, resume, resume_iter, seed)
+    randomize = params.randomize
+    k_map = params.k_map
+    trainer(params, device_id, batch_size, choice, alpha_l_1, alpha_l_2, alpha_l_inf, num_iter, epochs, epsilon_l_1, epsilon_l_2, epsilon_l_inf, lr_mode, msd_initialization, smallest_adv, n, opt_type, lr_max, resume, resume_iter, seed, randomize, k_map)

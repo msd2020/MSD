@@ -1,6 +1,6 @@
 import numpy as np
-import matplotlib
-import matplotlib.pyplot as plt
+# import matplotlib
+# import matplotlib.pyplot as plt
 from torchvision.datasets import CIFAR10
 from torch.utils.data import DataLoader, TensorDataset
 import torchvision.transforms as transforms
@@ -9,12 +9,20 @@ import torch.nn as nn
 import torch
 import ipdb
 import random
+from tqdm import tqdm
 
 def norms_l0(Z):
     return ((Z.view(Z.shape[0], -1)!=0).sum(dim=1)[:,None,None,None]).float()
 
 def norms_l1(Z):
     return Z.view(Z.shape[0], -1).abs().sum(dim=1)[:,None,None,None]
+
+
+def norms_l1_squeezed(Z):
+    return Z.view(Z.shape[0], -1).abs().sum(dim=1)[:,None,None,None].squeeze(1).squeeze(1).squeeze(1)
+
+def norms_l2_squeezed(Z):
+    return norms(Z).squeeze(1).squeeze(1).squeeze(1)
 
 def norms(Z):
     return Z.view(Z.shape[0], -1).norm(dim=1)[:,None,None,None]
@@ -41,7 +49,7 @@ def pgd_l2(model, X, y, epsilon=0.5, alpha=0.05, num_iter = 50, device = "cuda:0
     for t in range(num_iter):
         output = model(X+delta)
         incorrect = output.max(1)[1] != y 
-        correct = (~incorrect).unsqueeze(1).unsqueeze(1).unsqueeze(1).half()
+        correct = (~incorrect).unsqueeze(1).unsqueeze(1).unsqueeze(1).float()
         correct = 1.0 if version == 0 else correct
         #Finding the correct examples so as to attack only them only for version 1 (Test time)
         loss = nn.CrossEntropyLoss()(model(X + delta), y)
@@ -60,7 +68,7 @@ def pgd_l2(model, X, y, epsilon=0.5, alpha=0.05, num_iter = 50, device = "cuda:0
         for t in range(num_iter):
             output = model(X+delta)
             incorrect = output.max(1)[1] != y 
-            correct = (~incorrect).unsqueeze(1).unsqueeze(1).unsqueeze(1).half()
+            correct = (~incorrect).unsqueeze(1).unsqueeze(1).unsqueeze(1).float()
             correct = 1.0 if version == 0 else correct
             #Finding the correct examples so as to attack only them only for version 1
             loss = nn.CrossEntropyLoss()(model(X + delta), y)
@@ -78,9 +86,9 @@ def pgd_l2(model, X, y, epsilon=0.5, alpha=0.05, num_iter = 50, device = "cuda:0
     return max_delta    
 
 
-def pgd_l1_topk(model, X,y, epsilon = 12, alpha = 0.05, num_iter = 50, k = 20, device = "cuda:1", restarts = 1, version = 0):
+def pgd_l1_topk(model, X,y, epsilon = 12, alpha = 1.0, num_iter = 50, device = "cuda:1", restarts = 1, version = 0):
     #Gap : Dont attack pixels closer than the gap value to 0 or 1
-    gap = alpha
+    gap = 0.05
     alpha_global = alpha
     max_delta = torch.zeros_like(X)
     delta = torch.zeros_like(X, requires_grad = True)
@@ -88,13 +96,13 @@ def pgd_l1_topk(model, X,y, epsilon = 12, alpha = 0.05, num_iter = 50, k = 20, d
     for t in range (num_iter):
         output = model(X+delta)
         incorrect = output.max(1)[1] != y 
-        correct = (~incorrect).unsqueeze(1).unsqueeze(1).unsqueeze(1).half()
+        correct = (~incorrect).unsqueeze(1).unsqueeze(1).unsqueeze(1).float()
         correct = 1.0 if version == 0 else correct
         #Finding the correct examples so as to attack only them only for version 1
         loss = nn.CrossEntropyLoss()(model(X+delta), y)
         loss.backward()
         k = random.randint(5,20)
-        alpha = 20*alpha_global/k
+        alpha = (alpha_global/k)
         delta.data += alpha*correct*l1_dir_topk(delta.grad.detach(), delta.data, X, gap,k)
         if (norms_l1(delta) > epsilon).any():
             delta.data = proj_l1ball(delta.data, epsilon, device)
@@ -111,13 +119,13 @@ def pgd_l1_topk(model, X,y, epsilon = 12, alpha = 0.05, num_iter = 50, k = 20, d
         for t in range (num_iter):
             output = model(X+delta)
             incorrect = output.max(1)[1] != y 
-            correct = (~incorrect).unsqueeze(1).unsqueeze(1).unsqueeze(1).half()
+            correct = (~incorrect).unsqueeze(1).unsqueeze(1).unsqueeze(1).float()
             correct = 1.0 if version == 0 else correct
             #Finding the correct examples so as to attack only them only for version 1
             loss = nn.CrossEntropyLoss()(model(X+delta), y)
             loss.backward()
             k = random.randint(5,20)
-            alpha = 20*alpha_global/k
+            alpha = (alpha_global/k)
             delta.data += alpha*correct*l1_dir_topk(delta.grad.detach(), delta.data, X, gap,k)
             if (norms_l1(delta) > epsilon).any():
                 delta.data = proj_l1ball(delta.data, epsilon, device)
@@ -137,7 +145,7 @@ def pgd_linf(model, X, y, epsilon=0.03, alpha=0.003, num_iter = 40, device = "cu
     for t in range(num_iter):
         output = model(X+delta)
         incorrect = output.max(1)[1] != y 
-        correct = (~incorrect).unsqueeze(1).unsqueeze(1).unsqueeze(1).half()
+        correct = (~incorrect).unsqueeze(1).unsqueeze(1).unsqueeze(1).float()
         correct = 1.0 if version == 0 else correct
         #Finding the correct examples so as to attack only them only for version 1
         loss = nn.CrossEntropyLoss()(model(X + delta), y)
@@ -153,7 +161,7 @@ def pgd_linf(model, X, y, epsilon=0.03, alpha=0.003, num_iter = 40, device = "cu
         for t in range(num_iter):
             output = model(X+delta)
             incorrect = output.max(1)[1] != y 
-            correct = (~incorrect).unsqueeze(1).unsqueeze(1).unsqueeze(1).half()
+            correct = (~incorrect).unsqueeze(1).unsqueeze(1).unsqueeze(1).float()
             correct = 1.0 if version == 0 else correct
             #Finding the correct examples so as to attack only themonly for version 1
             loss = nn.CrossEntropyLoss()(model(X + delta), y)
@@ -193,8 +201,8 @@ def pgd_l0(model, X,y, epsilon = 12, alpha = 1, num_iter = 0, device = "cuda:1")
         val_min = minv[0].view(batch_size)
         pos_max = maxv[1].view(batch_size)
         pos_min = minv[1].view(batch_size)
-        select_max = (val_max.abs()>=val_min.abs()).half()
-        select_min = (val_max.abs()<val_min.abs()).half()
+        select_max = (val_max.abs()>=val_min.abs()).float()
+        select_min = (val_max.abs()<val_min.abs()).float()
         my_delta[torch.arange(batch_size), torch.zeros(batch_size, dtype = torch.long), pos_max] = (1-X.view(batch_size, 1, -1)[torch.arange(batch_size), torch.zeros(batch_size, dtype = torch.long), pos_max])*select_max
         my_delta[torch.arange(batch_size), torch.zeros(batch_size, dtype = torch.long), pos_min] = -X.view(batch_size, 1, -1)[torch.arange(batch_size), torch.zeros(batch_size, dtype = torch.long), pos_min]*select_min
         delta.data += my_delta.view(batch_size, 3, 32, 32)
@@ -204,38 +212,44 @@ def pgd_l0(model, X,y, epsilon = 12, alpha = 1, num_iter = 0, device = "cuda:1")
     return delta.detach()
 
 def msd_v0(model, X,y, epsilon_l_inf = 0.03, epsilon_l_2= 0.5, epsilon_l_1 = 12, 
-                alpha_l_inf = 0.003, alpha_l_2 = 0.05, alpha_l_1 = 0.05, num_iter = 50, device = "cuda:0"):
+                alpha_l_inf = 0.003, alpha_l_2 = 0.05, alpha_l_1 = 1.0, num_iter = 50, device = "cuda:0"):
     #MSD MODE
+    # print (num_iter)
     delta = torch.zeros_like(X,requires_grad = True)
     max_delta = torch.zeros_like(X)
     max_max_delta = torch.zeros_like(X)
-    max_loss = torch.zeros(y.shape[0]).to(y.device).half()
-    max_max_loss = torch.zeros(y.shape[0]).to(y.device).half()
+    max_loss = torch.zeros(y.shape[0]).to(y.device).float()
+    max_max_loss = torch.zeros(y.shape[0]).to(y.device).float()
     alpha_l_1_default = alpha_l_1
     
     for t in range(num_iter):
         loss = nn.CrossEntropyLoss()(model(X + delta), y)
         loss.backward()
-        with torch.no_grad():                
-            #For L_2
-            delta_l_2  = delta.data + alpha_l_2*delta.grad / norms(delta.grad)      
-            delta_l_2 *= epsilon_l_2 / norms(delta_l_2).clamp(min=epsilon_l_2)
-            delta_l_2  = torch.min(torch.max(delta_l_2, -X), 1-X) # clip X+delta to [0,1]
-
+        with torch.no_grad():       
             #For L_inf
             delta_l_inf=  (delta.data + alpha_l_inf*delta.grad.sign()).clamp(-epsilon_l_inf,epsilon_l_inf)
             delta_l_inf = torch.min(torch.max(delta_l_inf, -X), 1-X) # clip X+delta to [0,1]
 
+            #For L_2
+            if epsilon_l_2 == 0:
+                delta_l_2 = delta_l_inf*0
+            else:   
+                delta_l_2  = delta.data + alpha_l_2*delta.grad / norms(delta.grad)      
+                delta_l_2 *= epsilon_l_2 / norms(delta_l_2).clamp(min=epsilon_l_2)
+                delta_l_2  = torch.min(torch.max(delta_l_2, -X), 1-X) # clip X+delta to [0,1]
+
+            
+
             #For L1
             k = random.randint(5,20)
-            alpha_l_1 = (alpha_l_1_default/k)*20
+            alpha_l_1 = (alpha_l_1_default/k)
             delta_l_1  = delta.data + alpha_l_1*l1_dir_topk(delta.grad, delta.data, X, alpha_l_1, k = k)
             delta_l_1 = proj_l1ball(delta_l_1, epsilon_l_1, device)
             delta_l_1  = torch.min(torch.max(delta_l_1, -X), 1-X) # clip X+delta to [0,1]
             
             #Compare
             delta_tup = (delta_l_1, delta_l_2, delta_l_inf)
-            max_loss = torch.zeros(y.shape[0]).to(y.device).half()
+            max_loss = torch.zeros(y.shape[0]).to(y.device).float()
             for delta_temp in delta_tup:
                 loss_temp = nn.CrossEntropyLoss(reduction = 'none')(model(X + delta_temp), y)
                 max_delta[loss_temp >= max_loss] = delta_temp[loss_temp >= max_loss]
@@ -303,7 +317,7 @@ def l1_dir_topk(grad, delta, X, gap, k = 20) :
     grad_check[u] = 0
 
     kval = kthlargest(grad_check.abs().float(), k, dim = 2)[0].unsqueeze(1)
-    k_hot = (grad_check.abs() >= kval.half()).half() * grad_check.sign()
+    k_hot = (grad_check.abs() >= kval.float()).float() * grad_check.sign()
     return k_hot.view(batch_size, channels, pix, pix)
 
 def proj_l1ball(x, epsilon=10, device = "cuda:1"):
@@ -342,18 +356,18 @@ def proj_simplex(v, s=1, device = "cuda:1"):
     u, indices = torch.sort(u, descending = True)
     cssv = u.cumsum(dim = 2)
     # get the number of > 0 components of the optimal solution
-    vec = u * torch.arange(1, n+1).half().to(device)
-    comp = (vec > (cssv - s)).half()
+    vec = u * torch.arange(1, n+1).float().to(device)
+    comp = (vec > (cssv - s)).float()
 
     u = comp.cumsum(dim = 2)
     w = (comp-1).cumsum(dim = 2)
     u = u + w
     rho = torch.argmax(u, dim = 2)
     rho = rho.view(batch_size)
-    c = torch.HalfTensor([cssv[i,0,rho[i]] for i in range( cssv.shape[0]) ]).to(device)
+    c = torch.FloatTensor([cssv[i,0,rho[i]] for i in range( cssv.shape[0]) ]).to(device)
     c = c-s
     # compute the Lagrange multiplier associated to the simplex constraint
-    theta = torch.div(c,(rho.half() + 1))
+    theta = torch.div(c,(rho.float() + 1))
     theta = theta.view(batch_size,1,1,1)
     # compute the projection by thresholding v using theta
     w = (v - theta).clamp(min=0)
@@ -385,25 +399,31 @@ def epoch(loader, lr_schedule,  model, epoch_i, criterion = nn.CrossEntropyLoss(
     return train_loss / train_n, train_acc / train_n
 
 
-def epoch_adversarial_saver(batch_size,loader, model, attack, epsilon, num_iter, device = "cuda:0", restarts = 10):
+def epoch_adversarial_saver(num_examples,loader, model, attack, epsilon, num_iter, device = "cuda:0", restarts = 10):
     criterion = nn.CrossEntropyLoss()
     train_loss = 0
-    train_acc = 0
-    train_n = 0
+    test_acc = 0
+    test_n = 0
     # print("Attack: ", attack, " epsilon: ", epsilon )
+    eps = torch.ones(num_examples)
     for i,batch in enumerate(loader): 
         X,y = batch['input'], batch['target']
+        batch_size = X.shape[0]
         delta = attack(model, X, y, epsilon = epsilon, num_iter = num_iter, device = device, restarts = restarts)
         output = model(X+delta)
         loss = criterion(output, y)
         train_loss += loss.item()*y.size(0)
-        train_acc += (output.max(1)[1] == y).sum().item()
+        test_acc += (output.max(1)[1] == y).sum().item()
         correct = (output.max(1)[1] == y).float()
-        eps = (correct*1000 + epsilon - 0.000001).float()
-        train_n += y.size(0)
-        break
-    return eps,  train_acc / train_n
+        eps[i*batch_size:(i+1)*batch_size] = (correct*1000 + epsilon - 0.000001).float()
+        test_n += y.size(0)
+        if test_n >= num_examples:
+            break
 
+    return eps,  test_acc / test_n
+
+def r_len(loader):
+    return loader
 def epoch_adversarial(loader, lr_schedule, model, epoch_i, attack, criterion = nn.CrossEntropyLoss(), 
     opt=None, device = "cuda:0", stop = False, stats = False, **kwargs):
     """Adversarial training/evaluation epoch over the dataset"""
@@ -411,19 +431,12 @@ def epoch_adversarial(loader, lr_schedule, model, epoch_i, attack, criterion = n
     train_acc = 0
     train_n = 0
 #     ipdb.set_trace()
-    
-    for i,batch in enumerate(loader): 
+    i = 0
+    func = tqdm if opt!= None else r_len
+    for batch in func(loader): 
         X,y = batch['input'], batch['target']
-        if stats:
-            delta = attack(model, X, y, device = device, batchid = i, **kwargs)
-        else:
-            delta = attack(model, X, y, device = device, **kwargs)
+        delta = attack(model, X, y, device = device, **kwargs)
         output = model(X+delta)
-        # imshow(X[11])
-        # print (X[11])
-        # imshow((X+delta)[11])
-        # print (norms_l1(delta))
-#         output = model(X)
         loss = criterion(output, y)
         train_loss += loss.item()*y.size(0)
         train_acc += (output.max(1)[1] == y).sum().item()
@@ -437,6 +450,7 @@ def epoch_adversarial(loader, lr_schedule, model, epoch_i, attack, criterion = n
         else:
             if (stop):
                 break
+        i += 1
         
 #         break
         
@@ -445,7 +459,7 @@ def epoch_adversarial(loader, lr_schedule, model, epoch_i, attack, criterion = n
 
 def triple_adv(loader, lr_schedule, model, epoch_i, attack,  criterion = nn.CrossEntropyLoss(),
                      opt=None, device= "cuda:0", epsilon_l_1 = 12, epsilon_l_2 = 0.5, epsilon_l_inf = 0.03, 
-                     alpha_l_inf = 0.003, alpha_l_2 = 0.05, alpha_l_1 = 0.05, num_iter = 100, num_iter = 50):
+                     alpha_l_inf = 0.003, alpha_l_2 = 0.05, alpha_l_1 = 0.05, num_iter = 50):
     #AVG MODE
     train_loss = 0
     train_acc = 0

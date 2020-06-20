@@ -61,52 +61,35 @@ def get_attack(attack, fmodel):
     kwargs = {}
     # L0
     if attack == 'SAPA':
-        metric = foolbox.distances.L0
-        A = fa.SaltAndPepperNoiseAttack(fmodel, distance = metric)
+        A = fa.SaltAndPepperNoiseAttack()
     elif attack == 'PA':
-        metric = foolbox.distances.L0
-        A = fa.PointwiseAttack(fmodel, distance = metric)
+        A = fa.L1BrendelBethgeAttack()
 
     # L2
     elif 'IGD' in attack:
-        metric = foolbox.distances.MSE
-        A = fa.L2BasicIterativeAttack(fmodel, distance = metric)
-        # kwargs['epsilons'] = 1.5
+        A = fa.L2BasicIterativeAttack()
     elif attack == 'AGNA':
-        metric = foolbox.distances.MSE
-        kwargs['epsilons'] = np.linspace(0.5, 1, 50)
-        A = fa.AdditiveGaussianNoiseAttack(fmodel, distance = metric)
+        A = fa.L2AdditiveGaussianNoiseAttack()
     elif attack == 'BA':
-        metric = foolbox.distances.MSE
-        A = fa.BoundaryAttack(fmodel, distance = metric)
-        # A = foolbox.v1.attacks.BoundaryAttack(fmodel, distance = metric)
-        kwargs['log_every_n_steps'] = 5000001
+        A = fa.BoundaryAttack()
     elif 'DeepFool' in attack:
-        metric = foolbox.distances.MSE
-        A = fa.DeepFoolL2Attack(fmodel, distance = metric)
+        A = fa.L2DeepFoolAttack()
     elif attack == 'PAL2':
-        metric = foolbox.distances.MSE
-        A = fa.PointwiseAttack(fmodel, distance = metric)
+        A = fa.L2BrendelBethgeAttack()
     elif attack == "CWL2":
-        metric = foolbox.distances.MSE
-        A = fa.CarliniWagnerL2Attack(fmodel, distance = metric)
+        A = fa.L2CarliniWagnerAttack()
 
 
     # L inf
     elif 'FGSM' in attack and not 'IFGSM' in attack:
-        metric = foolbox.distances.Linf
-        A = fa.FGSM(fmodel, distance = metric)
-        kwargs['epsilons'] = 20
+        A = fa.FGSM()
     elif 'PGD' in attack:
-        metric = foolbox.distances.Linf
-        A = fa.LinfinityBasicIterativeAttack(fmodel, distance = metric)
+        A = fa.LinfPGD()
     elif 'IGM' in attack:
-        metric = foolbox.distances.Linf
-        A = fa.MomentumIterativeAttack(fmodel, distance = metric)
+        A = fa.LinfBrendelBethgeAttack()
     else:
         raise Exception('Not implemented')
-    return A, metric, args, kwargs
-
+    return A, 0,0,0
 
 
 def test_foolbox(model_name, max_tests):
@@ -286,12 +269,12 @@ def fast_adversarial_DDN(model_name):
 def test_pgd_saver(model_name):
     #Saves the minimum epsilon value for successfully attacking each image via PGD based attack as an npy file 
     #in the folder corresponding to model_name
-    eps_1 = [3,6,(10),12,20,30,50,60,70,80,90,100]
-    eps_2 = [0.1,0.2,0.3,0.5,1.0,1.5,2.0,2.5,3,5,7,10]
-    eps_3 = [0.05,0.1,0.15,0.2,0.3,0.4,0.5,0.6,0.7,0.8,0.9,1]
-    num_1 = [50,50,100,100,100,200,200,200,300,300,300,300]
-    num_2 = [30,40,50,50,100,100,150,150,150,150,300,300]
-    num_3 = [30,40,50,50,100,100,150,150,150,150,300,300]
+    eps_1 = [10]#[3,6,(10),12,20,30,50,60,70,80,90,100]
+    eps_2 = [2]#[0.1,0.2,0.3,0.5,1.0,1.5,2.0,2.5,3,5,7,10]
+    eps_3 = [0.3]#[0.05,0.1,0.15,0.2,0.3,0.4,0.5,0.6,0.7,0.8,0.9,1]
+    num_1 = [100]#[50,50,100,100,100,200,200,200,300,300,300,300]
+    num_2 = [100]#[30,40,50,50,100,100,150,150,150,150,300,300]
+    num_3 = [100]#[30,40,50,50,100,100,150,150,150,150,300,300]
     attacks_l1 = torch.ones((batch_size, 12))*1000
     attacks_l2 = torch.ones((batch_size, 12))*1000
     attacks_linf = torch.ones((batch_size, 12))*1000

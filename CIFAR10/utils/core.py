@@ -2,7 +2,7 @@ from inspect import signature
 from collections import namedtuple
 import time
 import numpy as np
-import pandas as pd
+#import pandas as pd
 from functools import singledispatch
 
 #####################

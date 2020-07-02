@@ -31,6 +31,7 @@ parser.add_argument("-alpha_l_1", help = "Step Size", type = float, default = 1.
 parser.add_argument("-alpha_l_2", help = "Step Size", type = float, default = 0.05)
 parser.add_argument("-alpha_l_inf", help = "Step Size", type = float, default = 0.003)
 parser.add_argument("-lr_max", help = "lr_max", type = float, default = 0.1)
+parser.add_argument("-lr_mode", help = "lr_mode", type = int, default = 1)
 parser.add_argument("-num_iter", help = "Iterations", type = int, default = 50)
 parser.add_argument("-model_id", help = "Id", type = int, default = 0)
 parser.add_argument("-resume", help = "resume", type = int, default = 0)
@@ -81,7 +82,10 @@ criterion = nn.CrossEntropyLoss()
 
 import time
 
-lr_schedule = lambda t: np.interp([t], [0, epochs*2//5, epochs*4//5, epochs], [0, lr_max, lr_max/10.0, 0])[0]
+if params.lr_mode == 1:
+	lr_schedule = lambda t: np.interp([t], [0, epochs*2//5, epochs*4//5, epochs], [0, lr_max, lr_max/10.0, 0])[0]
+else:
+	lr_schedule = lambda t: np.interp([t], [0, epochs//5, epochs*4//5, epochs], [lr_max, lr_max/5.0, lr_max/100, 0])[0]
 
 attack_list = [ pgd_linf ,  pgd_l1_topk,   pgd_l2 ,  msd_v0 ,  triple_adv ,  pgd_worst_dir, triple_adv]#TRIPLE, VANILLA DON'T HAVE A ATTACK NAME ANYTHING WORKS
 attack_name = ["pgd_linf", "pgd_l1_topk", "pgd_l2", "msd_v0", "triple_adv", "pgd_worst_dir", "vanilla"]
@@ -114,7 +118,10 @@ if params.resume:
     t_start = resume_iter + 1
     model.load_state_dict(torch.load(location, map_location = device))
 
+print (params)
+
 for epoch_i in range(t_start,epochs+1):  
+    model.train()
     print(epoch_i)
     start_time = time.time()
     lr = lr_schedule(epoch_i + (epoch_i+1)/len(train_batches))
@@ -133,6 +140,7 @@ for epoch_i in range(t_start,epochs+1):
     else:
         train_loss, train_acc = epoch_adversarial(train_batches, lr_schedule, model, epoch_i, attack, criterion, opt = opt, device = device)
 
+    model.eval()
     total_loss, total_acc   = epoch(test_batches, lr_schedule, model, epoch_i, criterion, opt = None, device = "cuda:1")
     total_loss, total_acc_1 = epoch_adversarial(test_batches, lr_schedule, model, epoch_i,  pgd_l1_topk, criterion, opt = None, device = device, stop = True, 
                                     epsilon = params.epsilon_l_1)
@@ -143,3 +151,5 @@ for epoch_i in range(t_start,epochs+1):
     myprint('Epoch: {7}, Clean Acc: {6:.4f} Train Acc: {5:.4f}, Test Acc 1: {4:.4f}, Test Acc 2: {3:.4f}, Test Acc inf: {2:.4f}, Time: {1:.1f}, lr: {0:.4f}'.format(lr, time.time()-start_time, total_acc_3, total_acc_2,total_acc_1,train_acc, total_acc, epoch_i))    
     if epoch_i %5 == 0:
         torch.save(model.state_dict(), "{0}/iter_{1}.pt".format(model_dir, str(epoch_i)))
+
+torch.save(model.state_dict(), "{0}/final.pt".format(model_dir))

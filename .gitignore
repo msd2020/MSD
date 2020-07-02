@@ -1,4 +1,8 @@
 MNIST/Models
 MNIST/selection_stats
 CIFAR10/data
+CIFAR10/*/__pycache__
+CIFAR10/__pycache__/
 CIFAR10/Models
+MNIST/Selected
+MNIST/__*/

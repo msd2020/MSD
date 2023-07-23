@@ -9,7 +9,7 @@ randomgen==1.16.0
 requests==2.22.0
 scipy==1.4.1
 seaborn==0.10.0
-torch==1.4.0
+torch==1.13.1
 torchfile==0.1.0
 torchvision==0.5.0
 pydot==1.4.1
